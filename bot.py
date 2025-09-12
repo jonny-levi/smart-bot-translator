@@ -6,6 +6,12 @@ from langdetect import detect
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+LANG_MAP = {
+    'he': 'iw',  # Hebrew fix for Google Translate
+    'iw': 'iw',
+    'ru': 'ru',
+}
+
 async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -13,18 +19,21 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     try:
         lang = detect(text)
-        print(f"Received message: {text}")
-        if lang == 'he':
-            translated = GoogleTranslator(source='iw', target='ru').translate(text)
-            await update.message.reply_text(f"🇮🇱 → 🇷🇺: {translated}")
-        elif lang == 'ru':
-            translated = GoogleTranslator(source='ru', target='iw').translate(text)
-            await update.message.reply_text(f"🇷🇺 → 🇮🇱: {translated}")
-        else:
+        print(f"Detected language: {lang} | Text: {text}")
+
+        if lang not in LANG_MAP:
             print(f"Ignored language: {lang}")
+            return
+
+        source_lang = LANG_MAP[lang]
+        target_lang = 'ru' if source_lang == 'iw' else 'iw'  # Swap target
+
+        translated = GoogleTranslator(source=source_lang, target=target_lang).translate(text)
+        await update.message.reply_text(f"{source_lang} → {target_lang}: {translated}")
+
     except Exception as e:
-        print(f"Translation failed: {e}")
-        await update.message.reply_text("❌ Translation failed.")
+        print(f"Translation failed: {repr(e)}")
+        await update.message.reply_text(f"❌ Translation failed: {e}")
 
 if __name__ == '__main__':
     print(f"BOT_TOKEN: {BOT_TOKEN}")
