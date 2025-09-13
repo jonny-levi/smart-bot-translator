@@ -14,7 +14,7 @@ jobs:
         with:
           token: ${{ secrets.PAT }} # Personal Access Token with "repo" scope
           repository: jonny-levi/onehundreddayschallenge
-          event-type: deploy-from-repoA
+          event-type: trigger-from-repoA
           client-payload: |
             {
               "commit_sha": "${{ github.sha }}",
