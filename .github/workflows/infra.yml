@@ -1,0 +1,22 @@
+name: Trigger Repo B
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  notify-repo-b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Repo B workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT }} # Personal Access Token with "repo" scope
+          repository: jonny-levi/onehundreddayschallenge
+          event-type: deploy-from-repoA
+          client-payload: |
+            {
+              "commit_sha": "${{ github.sha }}",
+              "repo": "${{ github.repository }}"
+            }
