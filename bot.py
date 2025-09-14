@@ -1,8 +1,16 @@
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from deep_translator import GoogleTranslator
+from langdetect import detect
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+LANG_MAP = {
+    'he': 'iw',  # Hebrew fix for Google Translate
+    'iw': 'iw',
+    'ru': 'ru',
+}
 
 async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -10,16 +18,15 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
     try:
-        # Use GoogleTranslator's detection
-        lang = GoogleTranslator().detect(text)
+        lang = detect(text)
         print(f"Detected language: {lang} | Text: {text}")
 
-        if lang not in ["he", "ru"]:
-            await update.message.reply_text("⚠️ Language not supported.")
+        if lang not in LANG_MAP:
+            print(f"Ignored language: {lang}")
             return
 
-        source_lang = "he" if lang in ["he", "iw"] else "ru"
-        target_lang = "ru" if source_lang == "he" else "he"
+        source_lang = LANG_MAP[lang]
+        target_lang = 'ru' if source_lang == 'iw' else 'iw'  # Swap target
 
         translated = GoogleTranslator(source=source_lang, target=target_lang).translate(text)
         await update.message.reply_text(f"{source_lang} → {target_lang}: {translated}")
@@ -29,6 +36,7 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Translation failed: {e}")
 
 if __name__ == '__main__':
+    print(f"BOT_TOKEN: {BOT_TOKEN}")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, smart_translate))
     app.run_polling()
