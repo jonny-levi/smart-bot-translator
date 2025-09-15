@@ -6,24 +6,24 @@ from langdetect import detect
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Normalize Hebrew codes
+# Normalize Hebrew to "iw"
 def normalize_lang(lang: str) -> str:
-    if lang in ["iw", "he"]:
-        return "he"
+    if lang in ["iw", "he"]:  # langdetect may return "he"
+        return "iw"
     return lang
 
-# Decide target language explicitly
+# Decide target language
 def get_target_lang(source_lang: str) -> str:
     if source_lang == "ru":
-        return "he"
-    elif source_lang == "he":
+        return "iw"
+    elif source_lang == "iw":
         return "ru"
     return "ru"
 
-# Flags for display
+# Flags
 FLAG_MAP = {
-    "he": "🇮🇱",
-    "ru": "🇷🇺",
+    "iw": "🇮🇱",  # Hebrew
+    "ru": "🇷🇺",  # Russian
 }
 
 async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -36,7 +36,7 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         source_lang = normalize_lang(detected)
         print(f"Detected: {detected} (normalized: {source_lang}) | Text: {text}")
 
-        if source_lang not in ["he", "ru"]:
+        if source_lang not in ["iw", "ru"]:
             await update.message.reply_text("⚠️ Only Hebrew ↔ Russian supported.")
             return
 
