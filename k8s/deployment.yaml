@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot-translator
+  labels:
+    app: bot-translator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bot-translator
+  template:
+    metadata:
+      labels:
+        app: bot-translator
+    spec:
+      containers:
+        - name: bot-translator
+          image: docker.io/jonathanlevi/bot-translator:v1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bot-translator-secret
+                  key: BOT_TOKEN
+          ports:
+            - containerPort: 8080
+              name: http
