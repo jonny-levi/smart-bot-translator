@@ -1,58 +1,62 @@
 import os
+import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-from deep_translator import GoogleTranslator
-from langdetect import detect
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Normalize Hebrew to "iw"
-def normalize_lang(lang: str) -> str:
-    if lang in ["iw", "he"]:  # langdetect may return "he"
-        return "iw"
-    return lang
-
-# Decide target language
-def get_target_lang(source_lang: str) -> str:
-    if source_lang == "ru":
-        return "iw"
-    elif source_lang == "iw":
-        return "ru"
-    return "ru"
-
-# Flags
+# Flags for display
 FLAG_MAP = {
     "iw": "🇮🇱",  # Hebrew
     "ru": "🇷🇺",  # Russian
 }
+
+# Detect Hebrew vs Russian using Unicode ranges
+def detect_language(text: str) -> str:
+    if re.search(r'[\u0590-\u05FF]', text):  # Hebrew Unicode range
+        return "iw"
+    elif re.search(r'[\u0400-\u04FF]', text):  # Cyrillic range
+        return "ru"
+    return "unknown"
+
+# Normalize Hebrew: remove nikud/te'amim
+def clean_hebrew(text: str) -> str:
+    return re.sub(r'[\u0591-\u05C7]', '', text)
+
+# Fallback translator
+def translate_text(text: str, source: str, target: str) -> str:
+    try:
+        return GoogleTranslator(source=source, target=target).translate(text)
+    except Exception as e:
+        print(f"⚠️ Google failed: {e}, using MyMemory...")
+        return MyMemoryTranslator(source=source, target=target).translate(text)
 
 async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text
-    try:
-        detected = detect(text)
-        source_lang = normalize_lang(detected)
-        print(f"Detected: {detected} (normalized: {source_lang}) | Text: {text}")
+    source_lang = detect_language(text)
 
-        if source_lang not in ["iw", "ru"]:
-            await update.message.reply_text("⚠️ Only Hebrew ↔ Russian supported.")
-            return
+    if source_lang == "unknown":
+        await update.message.reply_text("⚠️ Only Hebrew ↔ Russian supported.")
+        return
 
-        target_lang = get_target_lang(source_lang)
-        translated = GoogleTranslator(source=source_lang, target=target_lang).translate(text)
+    if source_lang == "iw":
+        text = clean_hebrew(text)  # normalize Hebrew
+        target_lang = "ru"
+    else:  # ru
+        target_lang = "iw"
 
-        flag_src = FLAG_MAP.get(source_lang, "")
-        flag_dst = FLAG_MAP.get(target_lang, "")
+    translated = translate_text(text, source_lang, target_lang)
 
-        await update.message.reply_text(
-            f"{flag_src} → {flag_dst}\n{translated}"
-        )
+    flag_src = FLAG_MAP.get(source_lang, "")
+    flag_dst = FLAG_MAP.get(target_lang, "")
 
-    except Exception as e:
-        print(f"Translation failed: {repr(e)}")
-        await update.message.reply_text(f"❌ Translation failed: {e}")
+    await update.message.reply_text(
+        f"{flag_src} → {flag_dst}\n{translated}"
+    )
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
