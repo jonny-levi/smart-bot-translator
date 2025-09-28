@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bot-translator
-          image: docker.io/jonathanlevi/bot-translator:v1.0.0
+          image: docker.io/jonathanlevi/bot-translator:v1.0.2
           imagePullPolicy: IfNotPresent
           env:
             - name: BOT_TOKEN
