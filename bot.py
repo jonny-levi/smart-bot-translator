@@ -23,23 +23,37 @@ def detect_language(text: str) -> str:
         return "uk"
     return "unknown"
 
-# Clean Hebrew text (remove nikud/te'amim)
+# Remove nikud (vowel marks) and te'amim from Hebrew text
 def clean_hebrew(text: str) -> str:
     return re.sub(r'[\u0591-\u05C7]', '', text)
+
+# Check if text contains only numbers/symbols/emojis (no letters)
+def is_nonverbal(text: str) -> bool:
+    # Remove spaces and check if anything left is not a letter
+    stripped = text.strip()
+    # Regex: contains no Hebrew, Latin, or Cyrillic letters
+    return not re.search(r'[A-Za-z\u0400-\u04FF\u0590-\u05FF]', stripped)
 
 # Translate with fallback
 def translate_text(text: str, source: str, target: str) -> str:
     try:
-        return GoogleTranslator(source=source, target=target).translate(text)
+        translated = GoogleTranslator(source=source, target=target).translate(text)
+        # Clean Hebrew vowels if translation is to Hebrew
+        if target == "iw":
+            translated = clean_hebrew(translated)
+        return translated
     except Exception as e:
         print(f"⚠️ GoogleTranslator failed: {e}, using MyMemory...")
         try:
-            return MyMemoryTranslator(source=source, target=target).translate(text)
+            translated = MyMemoryTranslator(source=source, target=target).translate(text)
+            if target == "iw":
+                translated = clean_hebrew(translated)
+            return translated
         except Exception as e2:
             print(f"❌ MyMemory failed: {e2}")
             return "Translation failed"
 
-# Split long texts into smaller chunks for better translation
+# Split long texts into smaller chunks
 def chunk_text(text: str, max_len: int = 200) -> list[str]:
     sentences = re.split(r'(?<=[.!?]) +', text)
     chunks = []
@@ -58,9 +72,15 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text
-    source_lang = detect_language(text)
+    text = update.message.text.strip()
+    if not text:
+        return
 
+    # Skip numbers, symbols, or emoji-only messages
+    if is_nonverbal(text):
+        return  # silently ignore
+
+    source_lang = detect_language(text)
     if source_lang == "unknown":
         await update.message.reply_text("⚠️ Only Hebrew, Russian, and Ukrainian are supported.")
         return
@@ -68,10 +88,10 @@ async def smart_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if source_lang == "iw":
         text = clean_hebrew(text)
         target_lang = "ru"
-    else:  # ru or uk
+    else:
         target_lang = "iw"
 
-    # Translate in chunks for long texts
+    # Translate in chunks
     chunks = chunk_text(text)
     translated_chunks = [translate_text(chunk, source_lang, target_lang) for chunk in chunks]
     translated = " ".join(translated_chunks)
