@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bot-translator
-          image: docker.io/jonathanlevi/bot-translator:v1.0.2
+          image: docker.io/jonathanlevi/bot-translator:v2.0.0
           imagePullPolicy: IfNotPresent
           env:
             - name: BOT_TOKEN
@@ -24,6 +24,16 @@ spec:
                 secretKeyRef:
                   name: bot-translator-secret
                   key: BOT_TOKEN
-          ports:
-            - containerPort: 8080
-              name: http
+            - name: LLM_URL
+              value: "http://172.20.10.47:12434"
+            - name: LLM_MODEL
+              value: "docker.io/ai/qwen3:4B-UD-Q8_K_XL"
+            - name: USE_LLM
+              value: "true"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
