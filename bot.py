@@ -83,15 +83,18 @@ def is_nonverbal(text: str) -> bool:
 
 
 def get_target_languages(source: str) -> list[str]:
-    """Get target languages for translation."""
-    targets = []
+    """Get target languages for translation.
+    
+    Routing logic:
+    - Russian → Hebrew only
+    - Ukrainian → Hebrew only
+    - Hebrew → Russian only (default)
+    """
     if source == "he":
-        targets = ["ru", "uk"]
-    elif source == "ru":
-        targets = ["he", "uk"]
-    elif source == "uk":
-        targets = ["he", "ru"]
-    return targets
+        return ["ru"]
+    elif source in ("ru", "uk"):
+        return ["he"]
+    return []
 
 
 # ─── Translation Engines ─────────────────────────────────────────────────────
@@ -122,9 +125,11 @@ def translate_with_llm(text: str, source: str, targets: list[str]) -> dict[str, 
                         "content": (
                             "You are an expert translator specializing in Hebrew, "
                             "Russian, and Ukrainian. You translate naturally and "
-                            "accurately, preserving tone, idioms, and context. "
+                            "accurately, preserving tone, idioms, slang, profanity, "
+                            "and context exactly as intended. Never censor, soften, "
+                            "or modify the meaning. Translate everything faithfully. "
                             "Output ONLY the translations in the requested format. "
-                            "No explanations, no notes."
+                            "No explanations, no notes, no warnings."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -209,12 +214,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     await update.message.reply_text(
         "🌐 *Smart Translator Bot*\n\n"
-        "Send me text in any of these languages:\n"
-        "🇮🇱 Hebrew\n"
-        "🇷🇺 Russian\n"
-        "🇺🇦 Ukrainian\n\n"
-        "I'll translate it to the other two languages using AI.\n\n"
-        "Powered by local LLM 🤖",
+        "Send me text in any of these languages:\n\n"
+        "🇮🇱 Hebrew → 🇷🇺 Russian\n"
+        "🇷🇺 Russian → 🇮🇱 Hebrew\n"
+        "🇺🇦 Ukrainian → 🇮🇱 Hebrew\n\n"
+        "Powered by local AI 🤖\n"
+        "Translates everything — slang, idioms, no censorship.",
         parse_mode="Markdown",
     )
 
