@@ -1,184 +1,119 @@
-# 🌐 Smart Bot Translator
+# Smart Bot Translator
 
-<div align="center">
+## Overview
 
-**AI-powered multilingual Telegram translation bot**
+Smart Bot Translator is a Telegram bot for natural multilingual translation between Hebrew, Russian, and Ukrainian. It uses a local OpenAI-compatible LLM endpoint for context-aware translation and falls back to Google Translate when the LLM is disabled or unavailable.
 
-Translate between Hebrew 🇮🇱, Russian 🇷🇺, and Ukrainian 🇺🇦 — powered by a local LLM for natural, context-aware translations.
+## Features
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)](https://python.org)
-[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com)
-[![Kubernetes](https://img.shields.io/badge/K8s-Deployed-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
+- Telegram polling bot built with `python-telegram-bot`.
+- Script-based language detection for Hebrew, Russian, and Ukrainian.
+- Translation routing:
+  - Hebrew → Russian
+  - Russian → Hebrew
+  - Ukrainian → Hebrew
+- Hebrew nikud/te'amim cleanup for cleaner output.
+- Local LLM translation via `/v1/chat/completions`.
+- Google Translate fallback through `deep-translator`.
+- `/start` and `/status` commands.
+- Docker image and Kubernetes deployment/service manifests.
 
-</div>
+## Architecture / Structure
 
----
-
-## ✨ Features
-
-- 🤖 **AI-Powered Translation** — Uses a local LLM (Qwen3 4B) for high-quality, context-aware translations
-- 🔄 **Auto Language Detection** — Detects Hebrew, Russian, and Ukrainian automatically (with Ukrainian-specific character detection)
-- 🌍 **Multi-Target Translation** — Translates to both other languages simultaneously
-- 🛡️ **Fallback System** — Automatically falls back to Google Translate if LLM is unavailable
-- 📊 **Status Command** — Check bot health and LLM connection with `/status`
-- 🐳 **Cloud Native** — Dockerized and deployed on Kubernetes
-
-## 🏗️ Architecture
-
-```
-┌──────────────┐     ┌───────────────┐     ┌──────────────────┐
-│   Telegram    │────▶│  Translator   │────▶│   Local LLM      │
-│   User Chat   │◀────│   Bot (K8s)   │◀────│  (Qwen3 4B GPU)  │
-└──────────────┘     └───────┬───────┘     └──────────────────┘
-                             │
-                      ┌──────┴───────┐
-                      │   Fallback   │
-                      │   Google     │
-                      │   Translate  │
-                      └──────────────┘
+```text
+bot.py                Bot entrypoint, language detection, translation handlers
+requirements.txt      Python dependencies
+Dockerfile            Container image for the bot
+k8s/deployment.yaml   Kubernetes Deployment using a BOT_TOKEN Secret
+k8s/service.yaml      Optional Kubernetes Service manifest
+.github/workflows/    Infrastructure/deployment workflow
 ```
 
-### Translation Flow
+Runtime flow:
 
-1. User sends a message in Hebrew, Russian, or Ukrainian
-2. Bot detects the source language using Unicode analysis
-3. Message is sent to the local LLM with translation instructions
-4. LLM returns natural, context-aware translations
-5. Bot replies with translations to both other languages
+1. Telegram sends a text message to the bot.
+2. `bot.py` detects the source language by Unicode script.
+3. The bot calls the configured local LLM endpoint when `USE_LLM=true`.
+4. If the LLM call fails, Google Translate is used as fallback.
+5. The translation is posted back to the Telegram chat.
 
-## 🚀 Quick Start
+## Prerequisites
 
-### Prerequisites
+- Python 3.11+ recommended.
+- A Telegram bot token from BotFather.
+- Optional: an OpenAI-compatible local LLM endpoint.
+- Optional for deployment: Docker and Kubernetes.
 
-- Python 3.12+
-- Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
-- (Optional) Local LLM with OpenAI-compatible API
-
-### Local Development
+## Getting Started
 
 ```bash
-# Clone the repo
-git clone https://github.com/jonny-levi/smart-bot-translator.git
-cd smart-bot-translator
-
-# Install dependencies
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Set environment variables
-export BOT_TOKEN="your-telegram-bot-token"
-export LLM_URL="http://your-llm-host:12434"    # Optional
-export LLM_MODEL="docker.io/ai/qwen3:4B-UD-Q8_K_XL"  # Optional
-
-# Run the bot
+export BOT_TOKEN="<telegram-bot-token>"
+export LLM_URL="http://<llm-host>:12434"
+export LLM_MODEL="docker.io/ai/qwen3:4B-UD-Q8_K_XL"
 python bot.py
 ```
+
+To run without the local LLM and rely on Google Translate fallback:
+
+```bash
+export USE_LLM=false
+python bot.py
+```
+
+## Configuration
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `BOT_TOKEN` | Yes | none | Telegram bot token. |
+| `LLM_URL` | No | local lab endpoint in code | Base URL for an OpenAI-compatible LLM API. Override for your environment. |
+| `LLM_MODEL` | No | `docker.io/ai/qwen3:4B-UD-Q8_K_XL` | Model ID sent to the LLM endpoint. |
+| `LLM_TIMEOUT` | No | `120` | LLM request timeout in seconds. |
+| `USE_LLM` | No | `true` | Set to `false` to skip LLM calls and use Google Translate. |
+
+> Do not commit real Telegram tokens or private endpoint details. Use environment variables and Kubernetes Secrets.
+
+## Deployment / Operations
 
 ### Docker
 
 ```bash
-docker build -t bot-translator:latest .
-
-docker run -d \
-  -e BOT_TOKEN="your-token" \
-  -e LLM_URL="http://your-llm-host:12434" \
-  --name translator \
-  bot-translator:latest
+docker build -t smart-bot-translator:latest .
+docker run --rm \
+  -e BOT_TOKEN="<telegram-bot-token>" \
+  -e LLM_URL="http://<llm-host>:12434" \
+  smart-bot-translator:latest
 ```
 
 ### Kubernetes
 
+Create the bot token secret before applying the manifests:
+
 ```bash
-# Create the secret
-kubectl create secret generic bot-translator-secret \
-  --from-literal=BOT_TOKEN="your-telegram-bot-token"
-
-# Deploy
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
+kubectl create secret generic smart-bot-translator-secrets \
+  --from-literal=BOT_TOKEN="<telegram-bot-token>"
+kubectl apply -f k8s/
 ```
 
-## ⚙️ Configuration
+Operational checks:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BOT_TOKEN` | — | Telegram Bot API token (required) |
-| `LLM_URL` | `http://172.20.10.47:12434` | OpenAI-compatible LLM endpoint |
-| `LLM_MODEL` | `docker.io/ai/qwen3:4B-UD-Q8_K_XL` | Model to use for translation |
-| `LLM_TIMEOUT` | `120` | LLM request timeout (seconds) |
-| `USE_LLM` | `true` | Enable LLM translation (`false` = Google only) |
-
-## 💬 Usage
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message and instructions |
-| `/status` | Check bot and LLM health |
-
-### Translation Examples
-
-**Hebrew → Russian + Ukrainian:**
-```
-User: שלום, מה שלומך?
-Bot:  🇮🇱 → 🇷🇺 | 🇺🇦
-      🇷🇺 Привет, как дела?
-      🇺🇦 Привіт, як справи?
+```bash
+kubectl get pods
+kubectl logs deploy/smart-bot-translator
 ```
 
-**Russian → Hebrew + Ukrainian:**
-```
-User: Доброе утро!
-Bot:  🇷🇺 → 🇮🇱 | 🇺🇦
-      🇮🇱 בוקר טוב!
-      🇺🇦 Доброго ранку!
-```
+Use `/status` in Telegram to verify bot and LLM connectivity.
 
-## 🧠 Why LLM over Google Translate?
+## Security Notes
 
-| Feature | Google Translate | Local LLM |
-|---------|-----------------|-----------|
-| Context awareness | ❌ Word-by-word | ✅ Full context |
-| Slang & idioms | ⚠️ Often wrong | ✅ Natural |
-| Tone preservation | ❌ Robotic | ✅ Human-like |
-| Privacy | ❌ Cloud-based | ✅ 100% local |
-| Cost | Free (limited) | Free (your GPU) |
-| Speed | Fast | Depends on GPU |
+- Keep `BOT_TOKEN` in a secret manager or Kubernetes Secret.
+- Treat translated text as user-generated content; avoid logging sensitive messages in production.
+- The LLM endpoint may receive private chat text. Run it in a trusted network and apply access controls.
+- The bot uses long polling; only one active instance should poll the same Telegram token at a time.
 
-## 📁 Project Structure
+## Author
 
-```
-smart-bot-translator/
-├── bot.py              # Main bot with LLM + fallback translation
-├── Dockerfile          # Container image
-├── requirements.txt    # Python dependencies
-├── k8s/
-│   ├── deployment.yaml # Kubernetes deployment
-│   └── service.yaml    # Kubernetes service
-└── .github/
-    └── workflows/
-        └── infra.yml   # CI/CD pipeline
-```
-
-## 🛣️ Roadmap
-
-- [ ] Add English support
-- [ ] Voice message translation (speech-to-text → translate → text-to-speech)
-- [ ] Inline mode (translate in any chat via @bot_username)
-- [ ] Translation memory (learn from corrections)
-- [ ] Fine-tuned model for Hebrew ↔ Russian/Ukrainian
-
-## 📄 License
-
-MIT
-
----
-
-<div align="center">
-
-**Built with ❤️ by [Jonny Levi](https://github.com/jonny-levi)**
-
-*Part of the AI-DevOps learning journey 🚀*
-
-</div>
+Jonny Levi — [jonny-levi](https://github.com/jonny-levi)
